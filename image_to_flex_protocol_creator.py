@@ -5,12 +5,15 @@ import csv
 import math
 
 #CASEY NOTES:
-#Drawn line should be continuous
-# anchor and fix UI elements
+# This app was hobbled together out of a cannibalized tutorial for a drawing game
+# To use it, run `pip install pygame` followed by `python3 image_to_flex_protocol_creator.py`
+
+# It works by mapping the drawn image to waypoints keyed by color
+# It coorrelates those waypoints to a given line Id by mouse up/down events, so we can draw cleanly
+# Saving the drawing outputs a output_waypoints.csv file usable as a run time parameter
 
 # in order to export that protocol actually what I can do is track the individual "cirles" dropped as "waypoints"
 # now THATS a killer idea^
-
 
 
 # Pygame Configuration
@@ -162,8 +165,6 @@ while True:
             pygame.quit()
             sys.exit()
         if event.type == pygame.MOUSEBUTTONUP:
-            # this is almost working right here, BUT the only problem is that it isn't incrementing the number quite right yet
-            # its incrementing when we click on color buttons
             lineId+=1
 
     # Drawing the Buttons
@@ -208,8 +209,7 @@ while True:
             lineId = 0
 
         # These waypoints will mark the labware center
-        # validate that these are correct by running a protocol that moves the pipette in a circle or something?
-        # only drop waypoints when were inside the canvas
+        # only drop waypoints when we are inside the canvas
         if (0 <= dx <= (canvasSize[0])) and (0 <= dy <= canvasSize[1]):
             x_waypoint = round((dx/canvasScale - 127/2)) # bottom left = 0, bottom right = 127
             y_waypoint = round((85 - round(dy/canvasScale)) - 85/2) # top left = 0, bottom left = 85 
