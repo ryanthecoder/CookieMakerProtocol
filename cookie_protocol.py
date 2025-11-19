@@ -73,29 +73,74 @@ def run(protocol: protocol_api.ProtocolContext):
     cookie_chute = protocol.load_waste_chute()
     tip_trash = protocol.load_trash_bin("A3")
 
+    frosting_lw = protocol.load_labware(f"opentrons_6_tuberack_nest_50ml_conical", "B2")
+
     # Frosting declarations
     # Red
     red_frosting = protocol.define_liquid("red_frosting", "Red Frosting", "#FF0000")
-    red_frosting_container = protocol.load_labware("opentrons_tough_1_reservoir_300ml", "D1")
-    red_frosting_container.load_liquid(["A1"], 300000, red_frosting)
+    red_frosting_container = frosting_lw.well("A1")
+    frosting_lw.load_liquid(["A1"], 45000, red_frosting)
+    red_tip = tips["A1"]
+    pipette.pick_up_tip(red_tip)
+    pipette.require_liquid_presence(red_frosting_container)
+    pipette.return_tip()
     # White
     white_frosting = protocol.define_liquid("white_frosting", "White Frosting", "#FFFFFF")
-    white_frosting_container = protocol.load_labware("opentrons_tough_1_reservoir_300ml", "C1")
-    white_frosting_container.load_liquid(["A1"], 300000, white_frosting)
+    white_frosting_container = frosting_lw.well("A2")
+    frosting_lw.load_liquid(["A2"], 45000, white_frosting)
+    white_tip = tips["B1"]
+    pipette.pick_up_tip(white_tip)
+    pipette.require_liquid_presence(white_frosting_container)
+    pipette.return_tip()
     # Blue
     blue_frosting = protocol.define_liquid("blue_frosting", "Blue Frosting", "#0000FF")
-    blue_frosting_container = protocol.load_labware("opentrons_tough_1_reservoir_300ml", "B1")
-    blue_frosting_container.load_liquid(["A1"], 300000, blue_frosting)
+    blue_frosting_container = frosting_lw.well("B1")
+    frosting_lw.load_liquid(["B1"], 45000, blue_frosting)
+    blue_tip = tips["C1"]
+    pipette.pick_up_tip(blue_tip)
+    pipette.require_liquid_presence(blue_frosting_container)
+    pipette.return_tip()
     # Green
     green_frosting = protocol.define_liquid("green_frosting", "Green Frosting", "#00FF00")
-    green_frosting_container = protocol.load_labware("opentrons_tough_1_reservoir_300ml", "A1")
-    green_frosting_container.load_liquid(["A1"], 300000, green_frosting)
+    green_frosting_container = frosting_lw.well("B2")
+    frosting_lw.load_liquid(["B2"], 45000, green_frosting_container)
+    green_tip = tips["D1"]
+    pipette.pick_up_tip(green_tip)
+    pipette.require_liquid_presence(green_frosting_container)
+    pipette.return_tip()
     # Yellow
     yellow_frosting = protocol.define_liquid("yellow_frosting", "Yellow Frosting", "#FFFF00")
-    yellow_frosting_container = protocol.load_labware("opentrons_tough_1_reservoir_300ml", "B2")
-    yellow_frosting_container.load_liquid(["A1"], 300000, yellow_frosting)
+    yellow_frosting_container = frosting_lw.well("C1")
+    frosting_lw.load_liquid(["C1"], 45000, yellow_frosting)
+    yellow_tip = tips["E1"]
+    pipette.pick_up_tip(yellow_tip)
+    pipette.require_liquid_presence(yellow_frosting_container)
+    pipette.return_tip()
 
-    def _color_to_lw(color: str) -> Labware:
+    #Get cookie Height
+
+    pipette.pick_up_tip(ips["F1"])
+    well_z = pipette.measure_liquid_height(cookie)
+    pipette.return_tip()
+
+
+    def _color_to_tip(color: str) -> Well:
+        match color:
+            case "Red":
+                return red_tip
+            case "White":
+                return white_tip
+            case "Blue":
+                return blue_tip
+            case "Green":
+                return green_tip
+            case "Yellow":
+                return yellow_tip
+            case _:
+                # Use white frosting if the color was unidentified
+                return white_tip
+
+    def _color_to_well(color: str) -> Well:
         match color:
             case "Red":
                 return red_frosting_container
@@ -110,28 +155,37 @@ def run(protocol: protocol_api.ProtocolContext):
             case _:
                 # Use white frosting if the color was unidentified
                 return white_frosting_container
-            
+
+
     # Handle cookie decoration!
-    pipette.pick_up_tip()
+    previous_color = "none"
     for i in range(len(cookie_pattern)):
         if i !=0 and cookie_pattern[i-1].line_id == cookie_pattern[i].line_id:
+            if previous_color != cookie_pattern[i].color:
+                if pipette.has_tip:
+                    pipette.drop_tip(tip_trash)
+                pipette.pick_up_tip(_color_to_tip(cookie_pattern[i].color))
             # These are part of the same line, start pipetting!
             dist = math.sqrt(((cookie_pattern[i].x - cookie_pattern[i-1].x) ** 2) + ((cookie_pattern[i].y - cookie_pattern[i-1].y) ** 2))
             frosting_volume = FROSTING_PER_MM * dist if (FROSTING_PER_MM * dist) <= 1000 else 1000
             # Casey NOTE: Try to prevent lines longer than the max length (127MM) from generating in the image app?
             # Probably not possible anyways unless the app got a larger canvas?
             protocol.comment(f"First point- x:{cookie_pattern[i-1].x} y:{cookie_pattern[i-1].y}  Second point- x:{cookie_pattern[i].x} y:{cookie_pattern[i].y}")
-            
-            well_z = cookie["A1"].center().point.z
-            start_loc = Point(
-                x=cookie["A1"].center().point.x + cookie_pattern[i-1].x,
-                y=cookie["A1"].center().point.y + cookie_pattern[i-1].y,
-                z=well_z
+
+
+            start_loc = cookie["A1"].bottom(z=well_z).move(
+                Point(
+                    x = cookie_pattern[i-1].x,
+                    y = cookie_pattern[i-1].y,
+                    z=0
+                )
             )
-            end_loc = Point(
-                x=cookie["A1"].center().point.x + cookie_pattern[i].x,
-                y=cookie["A1"].center().point.y + cookie_pattern[i].y,
-                z=well_z
+            end_loc = cookie["A1"].bottom(z=well_z).move(
+                Point(
+                    x = cookie_pattern[i].x,
+                    y = cookie_pattern[i].y,
+                    z=0
+                )
             )
 
             # Casey NOTE: Currently this results in us moving a few mm at a time, dispensing, and homing, over and over
@@ -139,18 +193,20 @@ def run(protocol: protocol_api.ProtocolContext):
             try:
                 pipette.dispense(
                     frosting_volume,
-                    location=Location(point=start_loc, labware=cookie["A1"]),
-                    end_location=Location(point=end_loc, labware=cookie["A1"])
+                    location=start_loc,
+                    end_location=end_loc
                 )
             except:
                 pipette.blow_out(tip_trash)
-                pipette.aspirate(volume=1000, location=_color_to_lw(cookie_pattern[i].color).wells_by_name()["A1"])
-                # try again
-                well_z = cookie["A1"].center().point.z
+                pipette.aspirate(
+                    volume=1000,
+                    location=_color_to_well(cookie_pattern[i].color).meniscus(z=-1, target="start"),
+                    end_location=_color_to_well(cookie_pattern[i].color).meniscus(z=-1, target="end")
+                )
                 pipette.dispense(
                     frosting_volume,
-                    location=Location(point=start_loc, labware=cookie["A1"]),
-                    end_location=Location(point=end_loc, labware=cookie["A1"])
+                    location=start_loc,
+                    end_location=end_loc
                 )
     pipette.drop_tip(tip_trash)
 
