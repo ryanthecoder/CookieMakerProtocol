@@ -26,8 +26,8 @@ FROSTING_PER_MM = 7.8
 class CookiePoint(BaseModel):
     line_id: int
     color: str
-    x: int
-    y: int
+    x: float
+    y: float
 
 def add_parameters(parameters: protocol_api.ParameterContext):
     parameters.add_csv_file(
