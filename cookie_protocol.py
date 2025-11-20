@@ -23,6 +23,8 @@ requirements = {
 # So at a 1 tip for a full line, you could do 85 straight lines top to bottom with a single tiprack
 FROSTING_PER_MM = 7.8
 
+FROSTING_FLOW_RATE=100
+
 class CookiePoint(BaseModel):
     line_id: int
     color: str
@@ -187,6 +189,7 @@ def run(protocol: protocol_api.ProtocolContext):
             if pipette.current_volume < frosting_volume:
                 pipette.aspirate(
                     volume=1000-pipette.current_volume,
+                    flow_rate=FROSTING_FLOW_RATE,
                     location=_color_to_well(cookie_pattern[i].color).meniscus(z=-1, target="start"),
                     end_location=_color_to_well(cookie_pattern[i].color).meniscus(z=-1, target="end")
                 )
@@ -214,6 +217,7 @@ def run(protocol: protocol_api.ProtocolContext):
             # it works but it would take forever and not look smooth. We need some kind of line smoothing formula, maybe from the painting app?
             pipette.dispense(
                 frosting_volume,
+                flow_rate=FROSTING_FLOW_RATE,
                 location=start_loc,
                 end_location=end_loc
             )
