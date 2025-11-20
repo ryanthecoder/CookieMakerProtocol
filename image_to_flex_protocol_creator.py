@@ -22,7 +22,7 @@ fps = 300
 fpsClock = pygame.time.Clock()
 width, height = 1280, 720
 screen = pygame.display.set_mode((width, height), pygame.RESIZABLE)
-
+pygame.display.set_caption('Opentrons Tough Cookie Maker')
 font = pygame.font.SysFont('Arial', 20)
 
 # Variables
@@ -130,6 +130,13 @@ def save():
         writer = csv.writer(csvfile)
         writer.writerows(clean_waypoints)
 
+# Global draw type tracker
+# current supports "point", the default which draws constantly as the mouse drags, and "line" which drops start and ends for line segments
+drawType = "Point"
+def set_draw_type(draw_type: str):
+    global drawType
+    drawType = draw_type
+
 # Button Variables.
 buttonWidth = 120
 buttonHeight = 35
@@ -141,6 +148,8 @@ buttons = [
     ['Green', lambda: changeColor([0, 255, 0], 'Green')],
     ['Yellow', lambda: changeColor([255, 255, 0], 'Yellow')],
     ['White', lambda: changeColor([255, 255, 255], 'White')],
+    ['Point', lambda: set_draw_type("Point")],
+    ['Line', lambda: set_draw_type("Line")],
     ['Save', save],
 ]
 
@@ -226,6 +235,12 @@ while True:
         [100, 100],
         30,
     )
+
+    # Reference Draw Type
+    draw_type_textarea = font.render(drawType, True, (255, 255, 255))
+    text_rect = draw_type_textarea.get_rect()
+    text_rect.topleft = (80, 150)
+    screen.blit(draw_type_textarea, text_rect)
 
     pygame.display.flip()
     fpsClock.tick(fps)
