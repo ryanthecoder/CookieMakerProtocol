@@ -25,6 +25,8 @@ FROSTING_PER_MM = 7.8
 
 FROSTING_FLOW_RATE=100
 
+DISPENSE_HEIGHT_ABOVE_COOKIE = 2.0
+
 class CookiePoint(BaseModel):
     line_id: int
     color: str
@@ -136,7 +138,7 @@ def run(protocol: protocol_api.ProtocolContext):
 
     if ctx.params.use_lld:
         pipette.pick_up_tip(ips["F1"])
-        well_z = pipette.measure_liquid_height(cookie)
+        well_z = pipette.measure_liquid_height(cookie) + DISPENSE_HEIGHT_ABOVE_COOKIE
         pipette.return_tip()
     else:
         well_z = 0
