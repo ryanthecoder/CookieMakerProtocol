@@ -168,6 +168,12 @@ def run(protocol: protocol_api.ProtocolContext):
             # These are part of the same line, start pipetting!
             dist = math.sqrt(((cookie_pattern[i].x - cookie_pattern[i-1].x) ** 2) + ((cookie_pattern[i].y - cookie_pattern[i-1].y) ** 2))
             frosting_volume = FROSTING_PER_MM * dist if (FROSTING_PER_MM * dist) <= 1000 else 1000
+            if pipette.current_volume < frosting_volume:
+                pipette.aspirate(
+                    volume=1000-pipette.current_volume,
+                    location=_color_to_well(cookie_pattern[i].color).meniscus(z=-1, target="start"),
+                    end_location=_color_to_well(cookie_pattern[i].color).meniscus(z=-1, target="end")
+                )
             # Casey NOTE: Try to prevent lines longer than the max length (127MM) from generating in the image app?
             # Probably not possible anyways unless the app got a larger canvas?
             protocol.comment(f"First point- x:{cookie_pattern[i-1].x} y:{cookie_pattern[i-1].y}  Second point- x:{cookie_pattern[i].x} y:{cookie_pattern[i].y}")
@@ -190,24 +196,11 @@ def run(protocol: protocol_api.ProtocolContext):
 
             # Casey NOTE: Currently this results in us moving a few mm at a time, dispensing, and homing, over and over
             # it works but it would take forever and not look smooth. We need some kind of line smoothing formula, maybe from the painting app?
-            try:
-                pipette.dispense(
-                    frosting_volume,
-                    location=start_loc,
-                    end_location=end_loc
-                )
-            except:
-                pipette.blow_out(tip_trash)
-                pipette.aspirate(
-                    volume=1000,
-                    location=_color_to_well(cookie_pattern[i].color).meniscus(z=-1, target="start"),
-                    end_location=_color_to_well(cookie_pattern[i].color).meniscus(z=-1, target="end")
-                )
-                pipette.dispense(
-                    frosting_volume,
-                    location=start_loc,
-                    end_location=end_loc
-                )
+            pipette.dispense(
+                frosting_volume,
+                location=start_loc,
+                end_location=end_loc
+            )
     pipette.drop_tip(tip_trash)
 
     # Dispense the cookie!
