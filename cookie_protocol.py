@@ -136,6 +136,8 @@ def run(protocol: protocol_api.ProtocolContext):
         pipette.pick_up_tip(ips["F1"])
         well_z = pipette.measure_liquid_height(cookie)
         pipette.return_tip()
+    else:
+        well_z = 0
 
 
     def _color_to_tip(color: str) -> Well:
