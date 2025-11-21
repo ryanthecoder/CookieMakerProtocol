@@ -49,7 +49,7 @@ def add_parameters(parameters: protocol_api.ParameterContext):
         display_name="Use LLD",
         description=(
             "Use LLD or just assume load liquid amounts."
-        )
+        ),
         default=True,
     )
 
@@ -92,7 +92,7 @@ def run(protocol: protocol_api.ProtocolContext):
     cookie = protocol.load_labware("opentrons_tough_cookie", "C2")
 
     # Load cookie dispenser and tip trash
-    cookie_chute = protocol.load_waste_chute()
+    #cookie_chute = protocol.load_waste_chute()
     tip_trash = protocol.load_trash_bin("A3")
 
     frosting_lw = protocol.load_labware(f"opentrons_6_tuberack_nest_50ml_conical", "B2")
@@ -103,7 +103,7 @@ def run(protocol: protocol_api.ProtocolContext):
     red_frosting_container = frosting_lw.well("A1")
     frosting_lw.load_liquid(["A1"], 45000, red_frosting)
     red_tip = tips["A1"]
-    if ctx.params.use_lld:
+    if protocol.params.use_lld:
         pipette.pick_up_tip(red_tip)
         pipette.require_liquid_presence(red_frosting_container)
         pipette.return_tip()
@@ -112,7 +112,7 @@ def run(protocol: protocol_api.ProtocolContext):
     white_frosting_container = frosting_lw.well("A2")
     frosting_lw.load_liquid(["A2"], 45000, white_frosting)
     white_tip = tips["B1"]
-    if ctx.params.use_lld:
+    if protocol.params.use_lld:
         pipette.pick_up_tip(white_tip)
         pipette.require_liquid_presence(white_frosting_container)
         pipette.return_tip()
@@ -121,40 +121,40 @@ def run(protocol: protocol_api.ProtocolContext):
     blue_frosting_container = frosting_lw.well("B1")
     frosting_lw.load_liquid(["B1"], 45000, blue_frosting)
     blue_tip = tips["C1"]
-    if ctx.params.use_lld:
+    if protocol.params.use_lld:
         pipette.pick_up_tip(blue_tip)
         pipette.require_liquid_presence(blue_frosting_container)
         pipette.return_tip()
     # Green
     green_frosting = protocol.define_liquid("green_frosting", "Green Frosting", "#00FF00")
     green_frosting_container = frosting_lw.well("B2")
-    frosting_lw.load_liquid(["B2"], 45000, green_frosting_container)
+    frosting_lw.load_liquid(["B2"], 45000, green_frosting)
     green_tip = tips["D1"]
-    if ctx.params.use_lld:
+    if protocol.params.use_lld:
         pipette.pick_up_tip(green_tip)
         pipette.require_liquid_presence(green_frosting_container)
         pipette.return_tip()
     # Yellow
     yellow_frosting = protocol.define_liquid("yellow_frosting", "Yellow Frosting", "#FFFF00")
-    yellow_frosting_container = frosting_lw.well("C1")
-    frosting_lw.load_liquid(["C1"], 45000, yellow_frosting)
+    yellow_frosting_container = frosting_lw.well("A3")
+    frosting_lw.load_liquid(["A3"], 45000, yellow_frosting)
     yellow_tip = tips["E1"]
-    if ctx.params.use_lld:
+    if protocol.params.use_lld:
         pipette.pick_up_tip(yellow_tip)
         pipette.require_liquid_presence(yellow_frosting_container)
         pipette.return_tip()
 
     #Get cookie Height
 
-    if ctx.params.use_lld:
-        pipette.pick_up_tip(ips["F1"])
-        well_z = pipette.measure_liquid_height(cookie) + DISPENSE_HEIGHT_ABOVE_COOKIE
+    if protocol.params.use_lld and not protocol.is_simulating():
+        pipette.pick_up_tip(tips["F1"])
+        well_z = pipette.measure_liquid_height(cookie.well("A1")) + DISPENSE_HEIGHT_ABOVE_COOKIE
         pipette.return_tip()
     else:
         well_z = 0
 
 
-    def _color_to_tip(color: str) -> Well:
+    def _color_to_tip(color: str):
         match color:
             case "Red":
                 return red_tip
@@ -170,7 +170,7 @@ def run(protocol: protocol_api.ProtocolContext):
                 # Use white frosting if the color was unidentified
                 return white_tip
 
-    def _color_to_well(color: str) -> Well:
+    def _color_to_well(color: str):
         match color:
             case "Red":
                 return red_frosting_container
@@ -195,6 +195,7 @@ def run(protocol: protocol_api.ProtocolContext):
                 if pipette.has_tip:
                     pipette.drop_tip(tip_trash)
                 pipette.pick_up_tip(_color_to_tip(cookie_pattern[i].color))
+                previous_color = cookie_pattern[i].color
             # These are part of the same line, start pipetting!
             dist = math.sqrt(((cookie_pattern[i].x - cookie_pattern[i-1].x) ** 2) + ((cookie_pattern[i].y - cookie_pattern[i-1].y) ** 2))
             frosting_volume = FROSTING_PER_MM * dist if (FROSTING_PER_MM * dist) <= 1000 else 1000
