@@ -27,6 +27,9 @@ FROSTING_FLOW_RATE=100
 
 DISPENSE_HEIGHT_ABOVE_COOKIE = 2.0
 
+# Known frosting colors
+FROSTING_COLORS = ['Red', 'Blue', 'Green', 'Yellow', 'White']
+
 class CookiePoint(BaseModel):
     line_id: int
     color: str
@@ -55,7 +58,7 @@ def order_cookie_pattern(csv_data: List[List[str]]) -> List[CookiePoint]:
     # csv objects go by row
     # row 1 would be: csv_data[0]
     # row 1 contains unique ID, color, x, y
-    cookie_pattern: List[CookiePoint] = []
+    unsorted_cookie_pattern: List[CookiePoint] = []
     for row in csv_data:
         point = CookiePoint(
             line_id=row[0],
@@ -63,7 +66,14 @@ def order_cookie_pattern(csv_data: List[List[str]]) -> List[CookiePoint]:
             x=row[2],
             y=row[3]
         )
-        cookie_pattern.append(point)
+        unsorted_cookie_pattern.append(point)
+
+    # re order to group all colors together
+    cookie_pattern: List[CookiePoint] = []
+    for color in FROSTING_COLORS:
+        for point in unsorted_cookie_pattern:
+            if point.color == color:
+                cookie_pattern.append(point)
 
     return cookie_pattern
 
