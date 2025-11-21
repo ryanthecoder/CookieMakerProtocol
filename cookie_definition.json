@@ -11,7 +11,7 @@
         ]
     },
     "metadata": {
-        "displayName": "Opentrons 1 Reservoir 300000 µL",
+        "displayName": "Opentrons Tough Cookie",
         "displayCategory": "reservoir",
         "displayVolumeUnits": "µL",
         "tags": []
@@ -19,18 +19,18 @@
     "dimensions": {
         "xDimension": 127.76,
         "yDimension": 85.48,
-        "zDimension": 2.5
+        "zDimension": 8.0
     },
     "wells": {
         "A1": {
-            "depth": 2.4,
+            "depth": 7.9,
             "totalLiquidVolume": 300000,
             "shape": "rectangular",
             "xDimension": 127,
             "yDimension": 85,
             "x": 63.88,
             "y": 42.74,
-            "z": 0.1
+            "z": 8.0
         }
     },
     "groups": [
@@ -51,7 +51,7 @@
         ],
         "isTiprack": false,
         "isMagneticModuleCompatible": false,
-        "loadName": "opentrons_1_reservoir_300000ul"
+        "loadName": "opentrons_tough_cookie"
     },
     "namespace": "custom_beta",
     "version": 1,
