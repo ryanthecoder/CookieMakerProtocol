@@ -178,13 +178,11 @@ while True:
             pygame.quit()
             sys.exit()
         if event.type == pygame.MOUSEBUTTONUP:
-            print(f"Draw type: {drawType} pointcounter: {pointCounter}")
             if drawType == "Point":
                 lineId+=1
                 pointCounter = 0
             elif drawType == "Line":
                 if pointCounter == 2:
-                    print("LINE GO UP")
                     lineId+=1
                     pointCounter = 0
 
