@@ -232,7 +232,6 @@ while True:
                             brushSize,
                         )
                         pointCounter+=1
-                        print(f"point counter: {pointCounter}")
                         waypoints.append( (lineId, colorName, x_waypoint, y_waypoint, drawType) )
 
         # linking dots:
