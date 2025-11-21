@@ -115,17 +115,19 @@ def save():
     clean_waypoints = []
     for waypt in waypoints:
         if waypt not in clean_waypoints:
-            # do not store waypoints closer than 3 mm apart
-            if len(clean_waypoints) > 0:
+            # do not store waypoints closer than 3 mm apart when drawing in point mode
+            if len(clean_waypoints) > 0 and waypt[4] == "Point":
                 waypt_x = waypt[2]
                 waypt_y = waypt[3]
                 waypt_x2 = clean_waypoints[len(clean_waypoints)-1][2]
                 waypt_y2 = clean_waypoints[len(clean_waypoints)-1][3]
                 dist = math.sqrt(((waypt_x2 - waypt_x) ** 2) + ((waypt_y2 - waypt_y) ** 2))
                 if dist >= MIN_WAYPOINT_DIST:
-                    clean_waypoints.append(waypt)
+                    clean_waypoints.append((waypt[0], waypt[1], waypt[2], waypt[3]))
+            elif len(clean_waypoints) > 0 and waypt[4] == "Line":
+                clean_waypoints.append((waypt[0], waypt[1], waypt[2], waypt[3]))
             else:
-                clean_waypoints.append(waypt)
+                clean_waypoints.append((waypt[0], waypt[1], waypt[2], waypt[3]))
     with open('output_waypoints.csv', 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerows(clean_waypoints)
@@ -133,6 +135,8 @@ def save():
 # Global draw type tracker
 # current supports "point", the default which draws constantly as the mouse drags, and "line" which drops start and ends for line segments
 drawType = "Point"
+global pointCounter
+pointCounter = 0
 def set_draw_type(draw_type: str):
     global drawType
     drawType = draw_type
@@ -174,7 +178,15 @@ while True:
             pygame.quit()
             sys.exit()
         if event.type == pygame.MOUSEBUTTONUP:
-            lineId+=1
+            print(f"Draw type: {drawType} pointcounter: {pointCounter}")
+            if drawType == "Point":
+                lineId+=1
+                pointCounter = 0
+            elif drawType == "Line":
+                if pointCounter == 2:
+                    print("LINE GO UP")
+                    lineId+=1
+                    pointCounter = 0
 
     # Drawing the Buttons
     for object in objects:
@@ -193,37 +205,56 @@ while True:
         dx = mx - x/2 + canvasSize[0]/2
         dy = my - y/2 + canvasSize[1]/2
 
-        pygame.draw.circle(
-            canvas,
-            drawColor,
-            [dx, dy],
-            brushSize,
-        )
-
-        # linking dots:
-        # since we never delete colors, as long as current lineId is the same as the last lineID used by the last waypoints 
-        # made, draw a line between this dot and the last dot
-        if lineId != -1 and lineId == oldLineId:
-            # start linking the dots
-            pygame.draw.line(
-                canvas,
-                drawColor,
-                [old_dx, old_dy],
-                [dx, dy],
-                width=brushSize,
-            )
-
         # start the dot tracking
         if lineId == -1:
             lineId = 0
+
+        old_len = len(waypoints)
 
         # These waypoints will mark the labware center
         # only drop waypoints when we are inside the canvas
         if (0 <= dx <= (canvasSize[0])) and (0 <= dy <= canvasSize[1]):
             x_waypoint = round((dx/canvasScale - 127/2)) # bottom left = 0, bottom right = 127
             y_waypoint = round((85 - round(dy/canvasScale)) - 85/2) # top left = 0, bottom left = 85 
-            waypoints.append( (lineId, colorName, x_waypoint, y_waypoint) )
-        
+            if drawType == "Point":
+                pygame.draw.circle(
+                    canvas,
+                    drawColor,
+                    [dx, dy],
+                    brushSize,
+                )
+                waypoints.append( (lineId, colorName, x_waypoint, y_waypoint, drawType) )
+            if drawType == "Line":
+                dist = math.sqrt(((old_dx - dx) ** 2) + ((old_dy - dy) ** 2))
+                if dist >= MIN_WAYPOINT_DIST and pointCounter < 2:
+                        pygame.draw.circle(
+                            canvas,
+                            drawColor,
+                            [dx, dy],
+                            brushSize,
+                        )
+                        pointCounter+=1
+                        print(f"point counter: {pointCounter}")
+                        waypoints.append( (lineId, colorName, x_waypoint, y_waypoint, drawType) )
+
+        # linking dots:
+        # since we never delete colors, as long as current lineId is the same as the last lineID used by the last waypoints 
+        # made, draw a line between this dot and the last dot
+        if lineId != -1 and lineId == oldLineId:
+            # start linking the dots, only draw lines between points on the canvas
+            if (
+                (0 <= dx <= (canvasSize[0])) and (0 <= dy <= canvasSize[1])
+                and (0 <= old_dx <= (canvasSize[0])) and (0 <= old_dy <= canvasSize[1])
+                and old_len != len(waypoints)
+            ):
+                pygame.draw.line(
+                    canvas,
+                    drawColor,
+                    [old_dx, old_dy],
+                    [dx, dy],
+                    width=brushSize,
+                )
+
         old_dx = dx
         old_dy = dy
         oldLineId = lineId
