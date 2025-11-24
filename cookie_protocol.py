@@ -26,6 +26,7 @@ FROSTING_PER_MM = 7.8
 FROSTING_FLOW_RATE=100
 
 DISPENSE_HEIGHT_ABOVE_COOKIE = 2.0
+WAYPOINT_Z_HEIGHT = 10.0
 
 # Known frosting colors
 FROSTING_COLORS = ['Red', 'Blue', 'Green', 'Yellow', 'White']
@@ -225,7 +226,8 @@ def run(protocol: protocol_api.ProtocolContext):
                     z=0
                 )
             )
-
+            # Move at Z height to the next start point
+            pipette.move_to(start_loc.move(Point(x=0,y=0,z=WAYPOINT_Z_HEIGHT)))
             # Casey NOTE: Currently this results in us moving a few mm at a time, dispensing, and homing, over and over
             # it works but it would take forever and not look smooth. We need some kind of line smoothing formula, maybe from the painting app?
             pipette.dispense(
@@ -234,6 +236,8 @@ def run(protocol: protocol_api.ProtocolContext):
                 location=start_loc,
                 end_location=end_loc
             )
+            # Retract back up so we're above the frosting for the next line
+            pipette.move_to(end_loc.move(Point(x=0,y=0,z=WAYPOINT_Z_HEIGHT)))
     pipette.drop_tip(tip_trash)
 
     # Dispense the cookie!
