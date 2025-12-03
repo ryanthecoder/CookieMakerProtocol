@@ -205,6 +205,8 @@ def save():
                 dist = math.sqrt(((waypt_x2 - waypt_x) ** 2) + ((waypt_y2 - waypt_y) ** 2))
                 if dist >= MIN_WAYPOINT_DIST:
                     clean_waypoints.append((waypt[0], waypt[1], waypt[2], waypt[3]))
+                elif (waypt[0] != clean_waypoints[len(clean_waypoints)-1][0]):
+                    clean_waypoints.append((waypt[0], waypt[1], waypt[2], waypt[3]))
             elif len(clean_waypoints) > 0 and waypt[4] == "Line":
                 clean_waypoints.append((waypt[0], waypt[1], waypt[2], waypt[3]))
             else:
@@ -327,8 +329,8 @@ while True:
         # These waypoints will mark the labware center
         # only drop waypoints when we are inside the canvas
         if (0 <= dx <= (canvasSize[0])) and (0 <= dy <= canvasSize[1]):
-            x_waypoint = round((dx/canvasScale - 127/2)) # bottom left = 0, bottom right = 127
-            y_waypoint = round((85 - round(dy/canvasScale)) - 85/2) # top left = 0, bottom left = 85 
+            x_waypoint = (dx/canvasScale - 127/2) # bottom left = 0, bottom right = 127
+            y_waypoint = (85 - round(dy/canvasScale)) - 85/2 # top left = 0, bottom left = 85 
             if drawType == "Point":
                 pygame.draw.circle(
                     canvas,
