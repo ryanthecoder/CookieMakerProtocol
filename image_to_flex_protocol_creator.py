@@ -39,7 +39,7 @@ brushSize = 3
 brushSizeSteps = 3
 
 # Minimum waypoint distance
-MIN_WAYPOINT_DIST = 3
+MIN_WAYPOINT_DIST = 2
 
 # Drawing Area Size
 # Each brush stroke is a single unit of icing
