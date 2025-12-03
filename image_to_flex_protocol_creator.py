@@ -47,8 +47,14 @@ plateSize = [127, 85]
 canvasScale = 5
 canvasSize = [plateSize[0]*canvasScale, plateSize[1]*canvasScale]
 
+# Canvas
+canvas = pygame.Surface(canvasSize)
+canvas.fill((250, 227, 171))
+
 # Waypoints tracker
 waypoints = []
+lineId = -1
+oldLineId = -1
 
 # Button Class
 class Button():
@@ -110,8 +116,83 @@ def changeColor(color, name):
     global colorName
     colorName = name
 
+
+# File handling text box setup
+input_box = pygame.Rect(280, 10, 200, 32)
+color_inactive = pygame.Color('lightskyblue3')
+color_active = pygame.Color('dodgerblue2')
+color = color_inactive
+active = False
+textbox = ''
+
+def determine_color(color: str) -> list:
+    match color:
+        case 'Red':
+            return [255, 0, 0]
+        case'Blue':
+            return [0, 0, 255]
+        case 'Green': 
+            return [0, 255, 0]
+        case 'Yellow':
+            return [255, 255, 0]
+        case 'White': 
+            return [255, 255, 255]
+    return [255,0,0]
+
+
+def load_existing_file():
+    file_path = textbox
+    if len(file_path) == 0:
+        # If they haven't entered a file name, do not load
+        print("File name not provided, could not load.")
+        return
+    
+    if '.csv' not in file_path:
+        file_path = file_path+'.csv'
+    # import the waypoints as individual points with line IDs
+    print(f"Opening: {file_path}")
+    with open(file_path, 'r', newline='') as csvfile:
+        global waypoints
+        waypoints = []
+        canvas.fill((250, 227, 171))
+        rows = csv.reader(csvfile)
+        for row in rows:
+            waypoints.append( (row[0], row[1], float(row[2]), float(row[3]), "LOADED_POINT") )
+    
+    # Re-render the image by line ID
+    last_waypt = None
+    for waypt in waypoints:
+        # Convert the waypoints back to canvas plot points
+        dx = canvasScale * (float(waypt[2])+ 127/2)
+        dy = canvasScale * ((-1 * float(waypt[3])) - 85/2 + 85)
+        pygame.draw.circle(
+            canvas,
+            determine_color(waypt[1]),
+            [dx, dy],
+            brushSize,
+        )
+        if last_waypt is not None:
+            if last_waypt[0] == waypt[0]:
+                last_dx = canvasScale * (float(last_waypt[2])+ 127/2)
+                last_dy = canvasScale * ((-1 * float(last_waypt[3])) - 85/2 + 85)
+                pygame.draw.line(
+                    canvas,
+                    determine_color(waypt[1]),
+                    [last_dx, last_dy],
+                    [dx, dy],
+                    width=brushSize,
+                )
+        last_waypt = waypt
+
+    global oldLineId
+    oldLineId = len(waypoints)
+    global lineId
+    lineId = len(waypoints) + 1
+
+
 # Save the surface to the Disk
 def save():
+    file_path = textbox
     clean_waypoints = []
     for waypt in waypoints:
         if waypt not in clean_waypoints:
@@ -128,9 +209,20 @@ def save():
                 clean_waypoints.append((waypt[0], waypt[1], waypt[2], waypt[3]))
             else:
                 clean_waypoints.append((waypt[0], waypt[1], waypt[2], waypt[3]))
-    with open('output_waypoints.csv', 'w', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerows(clean_waypoints)
+    if len(file_path) == 0:
+        # If they haven't entered a file name, do not save
+        print("File name not provided, could not save.")
+        return
+    
+    if '.csv' not in file_path:
+        file_path = file_path+'.csv'
+
+    with open(file_path, 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerows(clean_waypoints)
+    
+    print(f"Saved changes to \'{file_path}\'.")
+        
 
 # Global draw type tracker
 # current supports "point", the default which draws constantly as the mouse drags, and "line" which drops start and ends for line segments
@@ -154,21 +246,17 @@ buttons = [
     ['White', lambda: changeColor([255, 255, 255], 'White')],
     ['Point', lambda: set_draw_type("Point")],
     ['Line', lambda: set_draw_type("Line")],
-    ['Save', save],
 ]
 
 # Making the buttons
 for index, buttonName in enumerate(buttons):
-    Button(index * (buttonWidth + 10) + 10, 10, buttonWidth,
+    Button(index * (buttonWidth + 10) + 10, buttonHeight + 20, buttonWidth,
            buttonHeight, buttonName[0], buttonName[1])
-
-# Canvas
-canvas = pygame.Surface(canvasSize)
-canvas.fill((250, 227, 171))
+# File save and load button
+    Button(10, 10, buttonWidth, buttonHeight, 'Save', lambda: save())
+    Button(buttonWidth + 20, 10, buttonWidth, buttonHeight, 'Load', lambda: load_existing_file())
 
 # Game loop.
-lineId = -1
-oldLineId = -1
 old_dx = 0
 old_dy = 0
 while True:
@@ -185,6 +273,33 @@ while True:
                 if pointCounter == 2:
                     lineId+=1
                     pointCounter = 0
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            # If user clicked on the input_box
+            if input_box.collidepoint(event.pos):
+                active = not active
+            else:
+                active = False
+            color = color_active if active else color_inactive
+
+        if event.type == pygame.KEYDOWN:
+            if active:
+                if event.key == pygame.K_RETURN:
+                    # Filter out return keys
+                    pass 
+                elif event.key == pygame.K_BACKSPACE:
+                    textbox = textbox[:-1]
+                else:
+                    textbox += event.unicode
+
+    # Draw the file handling UI
+    pygame.draw.rect(screen, color, input_box, 2)
+
+    # Render text
+    txt_surface = font.render(textbox, True, color)
+    screen.blit(txt_surface, (input_box.x+5, input_box.y+5))
+
+    # Resize box if text is too long
+    input_box.w = max(200, txt_surface.get_width()+10)
 
     # Drawing the Buttons
     for object in objects:
@@ -260,14 +375,14 @@ while True:
     pygame.draw.circle(
         screen,
         drawColor,
-        [100, 100],
+        [100, 135],
         30,
     )
 
     # Reference Draw Type
     draw_type_textarea = font.render(drawType, True, (255, 255, 255))
     text_rect = draw_type_textarea.get_rect()
-    text_rect.topleft = (80, 150)
+    text_rect.topleft = (80, 175)
     screen.blit(draw_type_textarea, text_rect)
 
     pygame.display.flip()
