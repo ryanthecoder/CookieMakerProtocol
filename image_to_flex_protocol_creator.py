@@ -140,27 +140,10 @@ def determine_color(color: str) -> list:
     return [255,0,0]
 
 
-def load_existing_file():
-    file_path = textbox
-    if len(file_path) == 0:
-        # If they haven't entered a file name, do not load
-        print("File name not provided, could not load.")
-        return
-    
-    if '.csv' not in file_path:
-        file_path = file_path+'.csv'
-    # import the waypoints as individual points with line IDs
-    print(f"Opening: {file_path}")
-    with open(file_path, 'r', newline='') as csvfile:
-        global waypoints
-        waypoints = []
-        canvas.fill((250, 227, 171))
-        rows = csv.reader(csvfile)
-        for row in rows:
-            waypoints.append( (row[0], row[1], float(row[2]), float(row[3]), "LOADED_POINT") )
-    
+def rerender_canvas():
     # Re-render the image by line ID
     last_waypt = None
+    canvas.fill((250, 227, 171))
     for waypt in waypoints:
         # Convert the waypoints back to canvas plot points
         dx = canvasScale * (float(waypt[2])+ 127/2)
@@ -183,6 +166,42 @@ def load_existing_file():
                     width=brushSize,
                 )
         last_waypt = waypt
+
+def undo():
+    waypoints_with_line_removed = []
+    global waypoints
+    global lineId
+    line_to_remove = waypoints[-1][0]
+    for waypoint in waypoints:
+        if waypoint[0] != line_to_remove:
+            waypoints_with_line_removed.append(waypoint)
+    
+    waypoints = waypoints_with_line_removed
+    lineId = line_to_remove
+
+    rerender_canvas()
+
+
+def load_existing_file():
+    file_path = textbox
+    if len(file_path) == 0:
+        # If they haven't entered a file name, do not load
+        print("File name not provided, could not load.")
+        return
+    
+    if '.csv' not in file_path:
+        file_path = file_path+'.csv'
+    # import the waypoints as individual points with line IDs
+    print(f"Opening: {file_path}")
+    with open(file_path, 'r', newline='') as csvfile:
+        global waypoints
+        waypoints = []
+        rows = csv.reader(csvfile)
+        for row in rows:
+            waypoints.append( (row[0], row[1], float(row[2]), float(row[3]), "LOADED_POINT") )
+    
+    # Re-render the image by line ID
+    rerender_canvas()
 
     global oldLineId
     oldLineId = len(waypoints)
@@ -255,8 +274,9 @@ for index, buttonName in enumerate(buttons):
     Button(index * (buttonWidth + 10) + 10, buttonHeight + 20, buttonWidth,
            buttonHeight, buttonName[0], buttonName[1])
 # File save and load button
-    Button(10, 10, buttonWidth, buttonHeight, 'Save', lambda: save())
-    Button(buttonWidth + 20, 10, buttonWidth, buttonHeight, 'Load', lambda: load_existing_file())
+Button(10, 10, buttonWidth, buttonHeight, 'Save', lambda: save())
+Button(buttonWidth + 20, 10, buttonWidth, buttonHeight, 'Load', lambda: load_existing_file())
+Button(1280 - buttonWidth - 10, 10, buttonWidth, buttonHeight, '← Undo', lambda: undo())
 
 # Game loop.
 old_dx = 0
