@@ -331,6 +331,8 @@ while True:
         if (0 <= dx <= (canvasSize[0])) and (0 <= dy <= canvasSize[1]):
             x_waypoint = (dx/canvasScale - 127/2) # bottom left = 0, bottom right = 127
             y_waypoint = (85 - round(dy/canvasScale)) - 85/2 # top left = 0, bottom left = 85 
+            x_short = "%.3f" % x_waypoint
+            y_short = "%.3f" % y_waypoint
             if drawType == "Point":
                 pygame.draw.circle(
                     canvas,
@@ -338,7 +340,7 @@ while True:
                     [dx, dy],
                     brushSize,
                 )
-                waypoints.append( (lineId, colorName, x_waypoint, y_waypoint, drawType) )
+                waypoints.append( (lineId, colorName, float(x_short), float(y_short), drawType) )
             if drawType == "Line":
                 dist = math.sqrt(((old_dx - dx) ** 2) + ((old_dy - dy) ** 2))
                 if dist >= MIN_WAYPOINT_DIST and pointCounter < 2:
@@ -349,7 +351,7 @@ while True:
                             brushSize,
                         )
                         pointCounter+=1
-                        waypoints.append( (lineId, colorName, x_waypoint, y_waypoint, drawType) )
+                        waypoints.append( (lineId, colorName, float(x_short), float(y_short), drawType) )
 
         # linking dots:
         # since we never delete colors, as long as current lineId is the same as the last lineID used by the last waypoints 
