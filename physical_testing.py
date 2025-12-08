@@ -1,4 +1,3 @@
-# Happy Holidays! This is the Opentrons Tough Cookie Maker Protocol
 # This protocol is meant to be paired with the Opentrons Tough Cookie labware definition
 from opentrons import protocol_api
 from opentrons.protocol_api import Labware
@@ -9,7 +8,7 @@ import math
 
 metadata = {
     "protocolName": "Opentrons Tough Cookie hardware-testing Protocol",
-    "author": "Casey Batten",
+    "author": "Ryan Howard",
 }
 
 requirements = {
@@ -18,29 +17,88 @@ requirements = {
 
 }
 
-# Amount of uL of frosting to dispense per mm
-# This totals out to 1000~ uL of frosting for a single left-to-right line across the cookie
-# So at a 1 tip for a full line, you could do 85 straight lines top to bottom with a single tiprack
-FROSTING_PER_MM = 7.8
 
-FROSTING_FLOW_RATE=100
-
-DISPENSE_HEIGHT_ABOVE_COOKIE = 10
 WAYPOINT_Z_HEIGHT = 10.0
 
-# Known frosting colors
+def add_parameters(parameters) -> None:
+    """Build the runtime parameters."""
+    parameters.add_int(
+        display_name="Flow rate",
+        variable_name="flow_rate",
+        default=400,
+        minimum=1,
+        maximum=1000,
+        description="Flow rate",
+    )
+    parameters.add_int(
+        display_name="Drop Height",
+        variable_name="drop_height",
+        default=2,
+        minimum=1,
+        maximum=10,
+        description="drop height",
+    )
+    parameters.add_int(
+        display_name="Row Number",
+        variable_name="row_num",
+        default=1,
+        minimum=1,
+        maximum=8,
+        description="Which row to use",
+    )
+    parameters.add_float(
+        display_name="Frosting per mm",
+        variable_name="frosting_per_mm",
+        default=7.8,
+        minimum=0.5,
+        maximum=100,
+        description="how much frosting to dispense per mm",
+    )
+    parameters.add_int(
+        display_name="Pre wet cycles",
+        variable_name="prewet",
+        default=0,
+        minimum=0,
+        maximum=10,
+        description="How mnay cycles to prewet the tips",
+    )
+    parameters.add_int(
+        display_name="submerge depth",
+        variable_name="submerge_depth",
+        default=1,
+        minimum=1,
+        maximum=10,
+        description="how far down the frosting container to go",
+    )
+    parameters.add_str(
+        display_name="Frosting Well",
+        variable_name="frosting_well",
+        default="A2",
+        choices=[
+            {"display_name": name, "value": name}
+            for name in [
+                "A1",
+                "A2",
+                "A3",
+                "B1",
+                "B2",
+                "B3",
+            ]
+        ],
+        description="how far down the frosting container to go",
+    )
 
-class CookiePoint(BaseModel):
-    line_id: int
-    color: str
-    x: float
-    y: float
 
 
 
 def run(protocol: protocol_api.ProtocolContext):
     # Retrieve Run Time
 
+    FROSTING_FLOW_RATE=protocol.params.flow_rate
+    DISPENSE_HEIGHT_ABOVE_COOKIE = protocol.params.drop_height
+    FROSTING_PER_MM=protocol.params.frosting_per_mm
+    sd=-1*protocol.params.submerge_depth
+    i = protocol.params.row_num
     # Load frosting tips and pipette
     tips = protocol.load_labware("opentrons_flex_96_tiprack_1000ul", "A2")
     pipette = protocol.load_instrument("flex_1channel_1000", "left", tip_racks=[tips])
@@ -58,25 +116,21 @@ def run(protocol: protocol_api.ProtocolContext):
     # Frosting declarations
     # White
     white_frosting = protocol.define_liquid("white_frosting", "White Frosting", "#FFFFFF")
-    white_frosting_container = frosting_lw.well("A2")
+    white_frosting_container = frosting_lw.well(protocol.params.frosting_well)
     frosting_lw.load_liquid(["A2"], 45000, white_frosting)
     white_tip = tips["A1"]
     pipette.pick_up_tip(white_tip)
+    pipette.measure_liquid_height(cookie.well("A1"))
     pipette.require_liquid_presence(white_frosting_container)
-    pipette.return_tip()
     #Get cookie Height
 
-    pipette.pick_up_tip(tips["B1"])
-    pipette.measure_liquid_height(cookie.well("A1"))
-    pipette.return_tip()
 
     if protocol.is_simulating():
         well_z = 1
     else:
         well_z = cookie.well("A1").current_liquid_height()
-    points = [(Point(x=-62, y = -38 + i*9, z=DISPENSE_HEIGHT_ABOVE_COOKIE-i+well_z), Point(x=62, y = -38 + i*9, z=DISPENSE_HEIGHT_ABOVE_COOKIE-i+well_z)) for i in range (8)]
-
-    pipette.pick_up_tip(tips["A1"])
+    points = [(Point(x=-62, y = -38 + i*9, z=DISPENSE_HEIGHT_ABOVE_COOKIE+well_z), Point(x=62, y = -38 + i*9, z=DISPENSE_HEIGHT_ABOVE_COOKIE+well_z))]
+    first_fill = True
     for start, end in points:
         dist = math.sqrt(((start.x - end.x) ** 2) + ((start.y - end.y) ** 2))
         frosting_volume = FROSTING_PER_MM * dist if (FROSTING_PER_MM * dist) <= 1000 else 1000
@@ -84,9 +138,24 @@ def run(protocol: protocol_api.ProtocolContext):
             pipette.aspirate(
                 volume=1000-pipette.current_volume,
                 flow_rate=FROSTING_FLOW_RATE,
-                location=white_frosting_container.meniscus(z=-1, target="start"),
-                end_location=white_frosting_container.meniscus(z=-1, target="end")
+                location=white_frosting_container.meniscus(z=sd, target="start"),
+                end_location=white_frosting_container.meniscus(z=sd, target="end")
             )
+            if first_fill:
+                first_fill = False
+                for i in range(protocol.params.prewet):
+                    pipette.dispense(
+                        volume=1000,
+                        flow_rate=FROSTING_FLOW_RATE,
+                        location=white_frosting_container.meniscus(z=sd, target="start"),
+                        end_location=white_frosting_container.meniscus(z=sd, target="end")
+                    )
+                    pipette.aspirate(
+                        volume=1000,
+                        flow_rate=FROSTING_FLOW_RATE,
+                        location=white_frosting_container.meniscus(z=sd, target="start"),
+                        end_location=white_frosting_container.meniscus(z=sd, target="end")
+                    )
 
         start_loc = cookie["A1"].bottom().move(start)
         end_loc = cookie["A1"].bottom().move(end)
