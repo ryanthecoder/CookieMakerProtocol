@@ -171,7 +171,11 @@ def undo():
     waypoints_with_line_removed = []
     global waypoints
     global lineId
-    line_to_remove = waypoints[-1][0]
+    try:
+        line_to_remove = waypoints[-1][0]
+    except Exception as e:
+        print("Line to remove does not exist.")
+        return
     for waypoint in waypoints:
         if waypoint[0] != line_to_remove:
             waypoints_with_line_removed.append(waypoint)
@@ -193,20 +197,23 @@ def load_existing_file():
         file_path = file_path+'.csv'
     # import the waypoints as individual points with line IDs
     print(f"Opening: {file_path}")
-    with open(file_path, 'r', newline='') as csvfile:
-        global waypoints
-        waypoints = []
-        rows = csv.reader(csvfile)
-        for row in rows:
-            waypoints.append( (row[0], row[1], float(row[2]), float(row[3]), "LOADED_POINT") )
-    
-    # Re-render the image by line ID
-    rerender_canvas()
+    try:
+        with open(file_path, 'r', newline='') as csvfile:
+            global waypoints
+            waypoints = []
+            rows = csv.reader(csvfile)
+            for row in rows:
+                waypoints.append( (row[0], row[1], float(row[2]), float(row[3]), "LOADED_POINT") )
+        
+        # Re-render the image by line ID
+        rerender_canvas()
 
-    global oldLineId
-    oldLineId = len(waypoints)
-    global lineId
-    lineId = len(waypoints) + 1
+        global oldLineId
+        oldLineId = len(waypoints)
+        global lineId
+        lineId = len(waypoints) + 1
+    except Exception as e:
+        print(f"Failed to open file with following error: {e}")
 
 
 # Save the surface to the Disk
