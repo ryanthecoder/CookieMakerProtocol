@@ -136,10 +136,14 @@ def get_frosting_class(ctx: protocol_api.ProtocolContext, asp_retract_delay: flo
                             ),
                         ),
                         aspirate_position=TipPositionDict(
-                            position_reference=PositionReference.LIQUID_MENISCUS,
-                            offset={"x": 0, "y": 0, "z": 2},
+                            position_reference=PositionReference.LIQUID_MENISCUS_START,
+                            offset={"x": 0, "y": 0, "z": -2},
                         ),
                         flow_rate_by_volume=[(1000.0, FROSTING_FLOW_RATE)],
+                        aspirate_end_position=TipPositionDict(
+                            position_reference=PositionReference.LIQUID_MENISCUS_END,
+                            offset={"x": 0, "y": 0, "z": -2},
+                        ),
                         correction_by_volume=[(0.0, 0.0)],
                         pre_wet=True,
                         mix=MixPropertiesDict(enabled=False),
@@ -329,12 +333,7 @@ def run(ctx: protocol_api.ProtocolContext):
             transfer_properties = frosting_class.get_for(
                 pipette.name, tip_rack=tips.uri
             )
-            transfer_properties.aspirate.override_tip_positions(
-                new_position=PositionReference.LIQUID_MENISCUS_START,
-                new_offset=[0, 0, 0],
-                new_end_position=PositionReference.LIQUID_MENISCUS_END,
-                new_end_offset=[0, 0, 0],
-            )
+
             transfer_properties.dispense.override_tip_positions(
                 new_position=PositionReference.WELL_CENTER,
                 new_offset=[cookie_pattern[i-1].x, cookie_pattern[i-1].y, 0],
