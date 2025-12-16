@@ -20,6 +20,9 @@ from opentrons_shared_data.liquid_classes.liquid_class_definition import (
     PositionReference,
     BlowoutLocation,
 )
+from opentrons.protocol_api._liquid_properties import(
+    TipPosition
+)
 from opentrons.protocol_api.core.engine import transfer_components_executor as tx_comps_executor
 from typing import List
 from pydantic import BaseModel
@@ -179,7 +182,43 @@ def get_frosting_class(ctx: protocol_api.ProtocolContext, asp_retract_delay: flo
                             position_reference=PositionReference.WELL_TOP,
                             offset={"x": 0, "y": 0, "z": 0},
                         ),
-                        flow_rate_by_volume=[(1000.0, FROSTING_FLOW_RATE)],
+                        flow_rate_by_volume=[(0.0, FROSTING_FLOW_RATE)],
+                        correction_by_volume=[(0.0, 0.0)],
+                        push_out_by_volume=[(0, 0.0)],
+                        mix=MixPropertiesDict(enabled=False),
+                        delay=DelayPropertiesDict(enabled=False),
+                    ),
+                    dispense=MultiDispensePropertiesDict(
+                        submerge=SubmergeDict(
+                            start_position=TipPositionDict(
+                                position_reference=PositionReference.WELL_TOP,
+                                offset={"x": 0, "y": 0, "z": 0},
+                            ),
+                            speed=10,
+                            delay=DelayPropertiesDict(
+                                enabled=False,
+                            ),
+                        ),
+                        retract=RetractDispenseDict(
+                            end_position=TipPositionDict(
+                                position_reference=PositionReference.WELL_TOP,
+                                offset={"x": 0, "y": 0, "z": 0},
+                            ),
+                            speed=10,
+                            air_gap_by_volume=[(0.0, 0.0)],
+                            touch_tip=TouchTipPropertiesDict(enabled=False),
+                            delay=DelayPropertiesDict(enabled=False),
+                            blowout=BlowoutPropertiesDict(
+                                enabled=False,
+                                location=BlowoutLocation.TRASH,
+                                flow_rate=FROSTING_FLOW_RATE,
+                            ),
+                        ),
+                        dispense_position=TipPositionDict(
+                            position_reference=PositionReference.WELL_TOP,
+                            offset={"x": 0, "y": 0, "z": 0},
+                        ),
+                        flow_rate_by_volume=[(0.0, FROSTING_FLOW_RATE)],
                         correction_by_volume=[(0.0, 0.0)],
                         push_out_by_volume=[(0, 0.0)],
                         mix=MixPropertiesDict(enabled=False),
@@ -315,31 +354,40 @@ def run(ctx: protocol_api.ProtocolContext):
             dist = math.sqrt(((cookie_pattern[i].x - cookie_pattern[i-1].x) ** 2) + ((cookie_pattern[i].y - cookie_pattern[i-1].y) ** 2))
             frosting_volume = FROSTING_PER_MM * dist if (FROSTING_PER_MM * dist) <= 1000 else 1000
 
-            start_loc = cookie["A1"].bottom(z=well_z).move(
-                Point(
-                    x = cookie_pattern[i-1].x,
-                    y = cookie_pattern[i-1].y,
-                    z=0
-                )
-            )
-            end_loc = cookie["A1"].bottom(z=well_z).move(
-                Point(
-                    x = cookie_pattern[i].x,
-                    y = cookie_pattern[i].y,
-                    z=0
-                )
-            )
-
             transfer_properties = frosting_class.get_for(
                 pipette.name, tip_rack=tips.uri
             )
-
-            transfer_properties.dispense.override_tip_positions(
-                new_position=PositionReference.LIQUID_MENISCUS_START,
-                new_offset=[cookie_pattern[i-1].x, cookie_pattern[i-1].y, DISPENSE_HEIGHT_ABOVE_COOKIE],
-                new_end_position=PositionReference.LIQUID_MENISCUS_START,
-                new_end_offset=[cookie_pattern[i].x, cookie_pattern[i].y, DISPENSE_HEIGHT_ABOVE_COOKIE],
+            # just in case it's a single dispense
+            transfer_properties.dispense.submerge.start_position = TipPosition(
+                    position_reference=PositionReference.WELL_BOTTOM,
+                    offset=[cookie_pattern[i-1].x, cookie_pattern[i-1].y, well_z+WAYPOINT_Z_HEIGHT]
             )
+            transfer_properties.dispense.override_tip_positions(
+                new_position=PositionReference.WELL_BOTTOM,
+                new_offset=[cookie_pattern[i-1].x, cookie_pattern[i-1].y, well_z],
+                new_end_position=PositionReference.WELL_BOTTOM,
+                new_end_offset=[cookie_pattern[i].x, cookie_pattern[i].y, well_z],
+            )
+            transfer_properties.dispense.retract.end_position = TipPosition(
+                    position_reference=PositionReference.WELL_BOTTOM,
+                    offset=[cookie_pattern[i].x, cookie_pattern[i].y, well_z+WAYPOINT_Z_HEIGHT]
+            )
+            # is more likely to be a multi dispense
+            transfer_properties.mulit_dispense.submerge.start_position = TipPosition(
+                    position_reference=PositionReference.WELL_BOTTOM,
+                    offset=[cookie_pattern[i-1].x, cookie_pattern[i-1].y, well_z+WAYPOINT_Z_HEIGHT]
+            )
+            transfer_properties.mulit_dispense.override_tip_positions(
+                new_position=PositionReference.WELL_BOTTOM,
+                new_offset=[cookie_pattern[i-1].x, cookie_pattern[i-1].y, well_z],
+                new_end_position=PositionReference.WELL_BOTTOM,
+                new_end_offset=[cookie_pattern[i].x, cookie_pattern[i].y, well_z],
+            )
+            transfer_properties.mulit_dispense.retract.end_position = TipPosition(
+                    position_reference=PositionReference.WELL_BOTTOM,
+                    offset=[cookie_pattern[i].x, cookie_pattern[i].y, well_z+WAYPOINT_Z_HEIGHT]
+            )
+
             pipette._core.load_liquid_class(
                 name=frosting_class.name,
                 transfer_properties=transfer_properties,
@@ -370,7 +418,7 @@ def run(ctx: protocol_api.ProtocolContext):
                 volume=frosting_volume,
                 dest=(
                     cookie["A1"].top(),
-                    start_loc.labware.as_well()._core,
+                    cookie["A1"].labware.as_well()._core,
                 ),
                 source=None,
                 transfer_properties=transfer_properties,
