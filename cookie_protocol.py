@@ -1,8 +1,26 @@
 # Happy Holidays! This is the Opentrons Tough Cookie Maker Protocol
 # This protocol is meant to be paired with the Opentrons Tough Cookie labware definition
 from opentrons import protocol_api
-from opentrons.protocol_api import Labware
+from opentrons.protocol_api import Labware, LiquidClass
 from opentrons.types import Point, Location
+from opentrons_shared_data.liquid_classes.types import (
+    TransferPropertiesDict,
+    AspiratePropertiesDict,
+    SingleDispensePropertiesDict,
+    SubmergeDict,
+    RetractAspirateDict,
+    RetractDispenseDict,
+    MixPropertiesDict,
+    BlowoutPropertiesDict,
+    TouchTipPropertiesDict,
+    TipPositionDict,
+    DelayPropertiesDict,
+)
+from opentrons_shared_data.liquid_classes.liquid_class_definition import (
+    PositionReference,
+    BlowoutLocation,
+)
+from opentrons.protocol_api.core.engine import transfer_components_executor as tx_comps_executor
 from typing import List
 from pydantic import BaseModel
 import math
@@ -23,7 +41,7 @@ requirements = {
 # So at a 1 tip for a full line, you could do 85 straight lines top to bottom with a single tiprack
 FROSTING_PER_MM = 7.8
 
-FROSTING_FLOW_RATE=100
+FROSTING_FLOW_RATE=300
 
 DISPENSE_HEIGHT_ABOVE_COOKIE = 2.0
 WAYPOINT_Z_HEIGHT = 10.0
@@ -78,76 +96,161 @@ def order_cookie_pattern(csv_data: List[List[str]]) -> List[CookiePoint]:
 
     return cookie_pattern
 
+# todo(chb, 12-15-2025): Extend this to have more than just the aspirate retract delay parameter, possibly convert to RTP
+def get_frosting_class(ctx: protocol_api.ProtocolContext, asp_retract_delay: float) -> LiquidClass:
+    """Returns a frosting liquid class based on the provided parameters."""
+    return ctx.define_liquid_class(
+        name="frosting",
+        properties={"flex_1channel_1000" : {
+            "opentrons/opentrons_flex_96_tiprack_1000ul/1" : TransferPropertiesDict(
+                    aspirate=AspiratePropertiesDict(
+                        submerge=SubmergeDict(
+                            start_position=TipPositionDict(
+                                position_reference=PositionReference.LIQUID_MENISCUS,
+                                offset={"x": 0, "y": 0, "z": 2},
+                            ),
+                            speed=10,
+                            delay=DelayPropertiesDict(
+                                enabled=False,
+                            ),
+                        ),
+                        retract=RetractAspirateDict(
+                            end_position=TipPositionDict(
+                                position_reference=PositionReference.LIQUID_MENISCUS,
+                                offset={"x": 0, "y": 0, "z": 0},
+                            ),
+                            speed=10,
+                            air_gap_by_volume=[(0.0, 0.0)],
+                            touch_tip=TouchTipPropertiesDict(enabled=False),
+                            delay=DelayPropertiesDict(
+                                enabled=True,
+                                duration=asp_retract_delay,
+                            ),
+                        ),
+                        aspirate_position=TipPositionDict(
+                            position_reference=PositionReference.LIQUID_MENISCUS,
+                            offset={"x": 0, "y": 0, "z": 2},
+                        ),
+                        flow_rate_by_volume=[(1000.0, FROSTING_FLOW_RATE)],
+                        correction_by_volume=[(0.0, 0.0)],
+                        pre_wet=True,
+                        mix=MixPropertiesDict(enabled=False),
+                        delay=DelayPropertiesDict(enabled=False),
+                    ),
+                    dispense=SingleDispensePropertiesDict(
+                        submerge=SubmergeDict(
+                            start_position=TipPositionDict(
+                                position_reference=PositionReference.WELL_TOP,
+                                offset={"x": 0, "y": 0, "z": 0},
+                            ),
+                            speed=10,
+                            delay=DelayPropertiesDict(
+                                enabled=False,
+                            ),
+                        ),
+                        retract=RetractDispenseDict(
+                            end_position=TipPositionDict(
+                                position_reference=PositionReference.WELL_TOP,
+                                offset={"x": 0, "y": 0, "z": 0},
+                            ),
+                            speed=10,
+                            air_gap_by_volume=[(0.0, 0.0)],
+                            touch_tip=TouchTipPropertiesDict(enabled=False),
+                            delay=DelayPropertiesDict(enabled=False),
+                            blowout=BlowoutPropertiesDict(
+                                enabled=False,
+                                location=BlowoutLocation.TRASH,
+                                flow_rate=FROSTING_FLOW_RATE,
+                            ),
+                        ),
+                        dispense_position=TipPositionDict(
+                            position_reference=PositionReference.WELL_TOP,
+                            offset={"x": 0, "y": 0, "z": 0},
+                        ),
+                        flow_rate_by_volume=[(1000.0, FROSTING_FLOW_RATE)],
+                        correction_by_volume=[(0.0, 0.0)],
+                        push_out_by_volume=[(0, 0.0)],
+                        mix=MixPropertiesDict(enabled=False),
+                        delay=DelayPropertiesDict(enabled=False),
+                    ),
+                )
+            }
+        }
+    )
 
-def run(protocol: protocol_api.ProtocolContext):
+
+def run(ctx: protocol_api.ProtocolContext):
     # Retrieve Run Time Parameters
-    csv_data = protocol.params.cookie_pattern.parse_as_csv()
+    csv_data = ctx.params.cookie_pattern.parse_as_csv()
     cookie_pattern = order_cookie_pattern(csv_data)
 
     # Load frosting tips and pipette
-    tips = protocol.load_labware("opentrons_flex_96_tiprack_1000ul", "A2")
-    pipette = protocol.load_instrument("flex_1channel_1000", "left", tip_racks=[tips])
+    tips = ctx.load_labware("opentrons_flex_96_tiprack_1000ul", "A2")
+    pipette = ctx.load_instrument("flex_1channel_1000", "left", tip_racks=[tips])
 
     # Load cookie
     # TODO: make the cookie definition
-    cookie = protocol.load_labware("opentrons_tough_cookie", "C2")
+    cookie = ctx.load_labware("opentrons_tough_cookie", "C2")
 
     # Load cookie dispenser and tip trash
-    #cookie_chute = protocol.load_waste_chute()
-    tip_trash = protocol.load_trash_bin("A3")
+    #cookie_chute = ctx.load_waste_chute()
+    tip_trash = ctx.load_trash_bin("A3")
 
-    frosting_lw = protocol.load_labware(f"opentrons_6_tuberack_nest_50ml_conical", "B2")
+    frosting_lw = ctx.load_labware(f"opentrons_6_tuberack_nest_50ml_conical", "B2")
 
     # Frosting declarations
+    frosting_class = get_frosting_class(ctx, asp_retract_delay=5)
+    assert isinstance(frosting_class, LiquidClass)
+
     # Red
-    red_frosting = protocol.define_liquid("red_frosting", "Red Frosting", "#FF0000")
+    red_frosting = ctx.define_liquid("red_frosting", "Red Frosting", "#FF0000")
     red_frosting_container = frosting_lw.well("A1")
     frosting_lw.load_liquid(["A1"], 45000, red_frosting)
     red_tip = tips["A1"]
-    if protocol.params.use_lld:
+    if ctx.params.use_lld:
         pipette.pick_up_tip(red_tip)
         pipette.require_liquid_presence(red_frosting_container)
         pipette.return_tip()
     # White
-    white_frosting = protocol.define_liquid("white_frosting", "White Frosting", "#FFFFFF")
+    white_frosting = ctx.define_liquid("white_frosting", "White Frosting", "#FFFFFF")
     white_frosting_container = frosting_lw.well("A2")
     frosting_lw.load_liquid(["A2"], 45000, white_frosting)
     white_tip = tips["B1"]
-    if protocol.params.use_lld:
+    if ctx.params.use_lld:
         pipette.pick_up_tip(white_tip)
         pipette.require_liquid_presence(white_frosting_container)
         pipette.return_tip()
     # Blue
-    blue_frosting = protocol.define_liquid("blue_frosting", "Blue Frosting", "#0000FF")
+    blue_frosting = ctx.define_liquid("blue_frosting", "Blue Frosting", "#0000FF")
     blue_frosting_container = frosting_lw.well("B1")
     frosting_lw.load_liquid(["B1"], 45000, blue_frosting)
     blue_tip = tips["C1"]
-    if protocol.params.use_lld:
+    if ctx.params.use_lld:
         pipette.pick_up_tip(blue_tip)
         pipette.require_liquid_presence(blue_frosting_container)
         pipette.return_tip()
     # Green
-    green_frosting = protocol.define_liquid("green_frosting", "Green Frosting", "#00FF00")
+    green_frosting = ctx.define_liquid("green_frosting", "Green Frosting", "#00FF00")
     green_frosting_container = frosting_lw.well("B2")
     frosting_lw.load_liquid(["B2"], 45000, green_frosting)
     green_tip = tips["D1"]
-    if protocol.params.use_lld:
+    if ctx.params.use_lld:
         pipette.pick_up_tip(green_tip)
         pipette.require_liquid_presence(green_frosting_container)
         pipette.return_tip()
     # Yellow
-    yellow_frosting = protocol.define_liquid("yellow_frosting", "Yellow Frosting", "#FFFF00")
+    yellow_frosting = ctx.define_liquid("yellow_frosting", "Yellow Frosting", "#FFFF00")
     yellow_frosting_container = frosting_lw.well("A3")
     frosting_lw.load_liquid(["A3"], 45000, yellow_frosting)
     yellow_tip = tips["E1"]
-    if protocol.params.use_lld:
+    if ctx.params.use_lld:
         pipette.pick_up_tip(yellow_tip)
         pipette.require_liquid_presence(yellow_frosting_container)
         pipette.return_tip()
 
     #Get cookie Height
 
-    if protocol.params.use_lld and not protocol.is_simulating():
+    if ctx.params.use_lld and not ctx.is_simulating():
         pipette.pick_up_tip(tips["F1"])
         well_z = pipette.measure_liquid_height(cookie.well("A1")) + DISPENSE_HEIGHT_ABOVE_COOKIE
         pipette.return_tip()
@@ -190,6 +293,7 @@ def run(protocol: protocol_api.ProtocolContext):
 
     # Handle cookie decoration!
     previous_color = "none"
+    contents: List[tx_comps_executor.LiquidAndAirGapPair] = []
     for i in range(len(cookie_pattern)):
         if i !=0 and cookie_pattern[i-1].line_id == cookie_pattern[i].line_id:
             if previous_color != cookie_pattern[i].color:
@@ -200,17 +304,6 @@ def run(protocol: protocol_api.ProtocolContext):
             # These are part of the same line, start pipetting!
             dist = math.sqrt(((cookie_pattern[i].x - cookie_pattern[i-1].x) ** 2) + ((cookie_pattern[i].y - cookie_pattern[i-1].y) ** 2))
             frosting_volume = FROSTING_PER_MM * dist if (FROSTING_PER_MM * dist) <= 1000 else 1000
-            if pipette.current_volume < frosting_volume:
-                pipette.aspirate(
-                    volume=1000-pipette.current_volume,
-                    flow_rate=FROSTING_FLOW_RATE,
-                    location=_color_to_well(cookie_pattern[i].color).meniscus(z=-1, target="start"),
-                    end_location=_color_to_well(cookie_pattern[i].color).meniscus(z=-1, target="end")
-                )
-            # Casey NOTE: Try to prevent lines longer than the max length (127MM) from generating in the image app?
-            # Probably not possible anyways unless the app got a larger canvas?
-            protocol.comment(f"First point- x:{cookie_pattern[i-1].x} y:{cookie_pattern[i-1].y}  Second point- x:{cookie_pattern[i].x} y:{cookie_pattern[i].y}")
-
 
             start_loc = cookie["A1"].bottom(z=well_z).move(
                 Point(
@@ -226,21 +319,92 @@ def run(protocol: protocol_api.ProtocolContext):
                     z=0
                 )
             )
+
+            transfer_properties = frosting_class.get_for(
+                pipette.name, tip_rack=tips.uri
+            )
+            transfer_properties.aspirate.override_tip_positions(
+                new_position=PositionReference.LIQUID_MENISCUS_START,
+                new_offset=[0, 0, 0],
+                new_end_position=PositionReference.LIQUID_MENISCUS_END,
+                new_end_offset=[0, 0, 0],
+            )
+            transfer_properties.dispense.override_tip_positions(
+                new_position=PositionReference.WELL_CENTER,
+                new_offset=[cookie_pattern[i-1].x, cookie_pattern[i-1].y, 0],
+                new_end_position=PositionReference.WELL_CENTER,
+                new_end_offset=[cookie_pattern[i].x, cookie_pattern[i].y, 0],
+            )
+            pipette._core.load_liquid_class(
+                name=frosting_class.name,
+                transfer_properties=transfer_properties,
+                tiprack_uri=tips.uri
+            )
+            if pipette.current_volume < frosting_volume:
+                # Handle liquid class aspiration
+                contents = pipette._core.aspirate_liquid_class(  
+                    volume=1000-pipette.current_volume,
+                    source=(
+                        _color_to_well(cookie_pattern[i].color).meniscus(z=-1, target="start"),
+                        _color_to_well(cookie_pattern[i].color)._core,
+                    ),
+                    transfer_properties=transfer_properties,
+                    transfer_type=tx_comps_executor.TransferType.ONE_TO_ONE,
+                    tip_contents=[
+                        tx_comps_executor.LiquidAndAirGapPair(
+                            liquid=0,
+                            air_gap=0,
+                        )
+                    ],
+                    volume_for_pipette_mode_configuration=None,
+                )
+
+                
+                # CASEY NOTE: Original aspirate commented out to take advantage of liquid classes
+                # pipette.aspirate(
+                #     volume=1000-pipette.current_volume,
+                #     flow_rate=FROSTING_FLOW_RATE,
+                #     location=_color_to_well(cookie_pattern[i].color).meniscus(z=-1, target="start"),
+                #     end_location=_color_to_well(cookie_pattern[i].color).meniscus(z=-1, target="end")
+                # )
+
+            # Casey NOTE: Try to prevent lines longer than the max length (127MM) from generating in the image app?
+            # Probably not possible anyways unless the app got a larger canvas?
+            ctx.comment(f"First point- x:{cookie_pattern[i-1].x} y:{cookie_pattern[i-1].y}  Second point- x:{cookie_pattern[i].x} y:{cookie_pattern[i].y}")
+
+
+            
             # Move at Z height to the next start point
-            pipette.move_to(start_loc.move(Point(x=0,y=0,z=WAYPOINT_Z_HEIGHT)))
+            #pipette.move_to(start_loc.move(Point(x=0,y=0,z=WAYPOINT_Z_HEIGHT)))
+
+            pipette._core.dispense_liquid_class( 
+                volume=frosting_volume,
+                dest=(
+                    start_loc,
+                    start_loc.labware.as_well()._core,
+                ),
+                source=None,
+                transfer_properties=transfer_properties,
+                transfer_type=tx_comps_executor.TransferType.ONE_TO_ONE,
+                tip_contents=contents,
+                add_final_air_gap=False,
+                trash_location=tip_trash,
+            )
+
+            # CASEY NOTE: Original dispense commented out to take advantage of liquid classes
             # Casey NOTE: Currently this results in us moving a few mm at a time, dispensing, and homing, over and over
             # it works but it would take forever and not look smooth. We need some kind of line smoothing formula, maybe from the painting app?
-            pipette.dispense(
-                frosting_volume,
-                flow_rate=FROSTING_FLOW_RATE,
-                location=start_loc,
-                end_location=end_loc
-            )
+            # pipette.dispense(
+            #     frosting_volume,
+            #     flow_rate=FROSTING_FLOW_RATE,
+            #     location=start_loc,
+            #     end_location=end_loc
+            # )
             # Retract back up so we're above the frosting for the next line
-            pipette.move_to(end_loc.move(Point(x=0,y=0,z=WAYPOINT_Z_HEIGHT)))
+            #pipette.move_to(end_loc.move(Point(x=0,y=0,z=WAYPOINT_Z_HEIGHT)))
     pipette.drop_tip(tip_trash)
 
     # Dispense the cookie!
-    protocol.capture_image(home_before=True, filename="Cookie_pic", zoom=2.0)
-    protocol.pause(msg="GET READY TO CATCH THE DISPENSED COOKIE! HAPPY HOLIDAYS!")
-    #protocol.move_labware(cookie, cookie_chute, use_gripper=True)
+    ctx.capture_image(home_before=True, filename="Cookie_pic", zoom=2.0)
+    ctx.pause(msg="GET READY TO CATCH THE DISPENSED COOKIE! HAPPY HOLIDAYS!")
+    #ctx.move_labware(cookie, cookie_chute, use_gripper=True)
