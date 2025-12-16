@@ -136,11 +136,11 @@ def get_frosting_class(ctx: protocol_api.ProtocolContext, asp_retract_delay: flo
                             position_reference=PositionReference.LIQUID_MENISCUS_START,
                             offset={"x": 0, "y": 0, "z": -2},
                         ),
-                        flow_rate_by_volume=[(1000.0, FROSTING_FLOW_RATE)],
                         aspirate_end_position=TipPositionDict(
                             position_reference=PositionReference.LIQUID_MENISCUS_END,
                             offset={"x": 0, "y": 0, "z": -2},
                         ),
+                        flow_rate_by_volume=[(0.0, FROSTING_FLOW_RATE)],
                         correction_by_volume=[(0.0, 0.0)],
                         pre_wet=True,
                         mix=MixPropertiesDict(enabled=False),
