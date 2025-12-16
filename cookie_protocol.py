@@ -130,10 +130,7 @@ def get_frosting_class(ctx: protocol_api.ProtocolContext, asp_retract_delay: flo
                             speed=10,
                             air_gap_by_volume=[(0.0, 5.0), (995.0, 5.0), (1000.0, 0.0)],
                             touch_tip=TouchTipPropertiesDict(enabled=False),
-                            delay=DelayPropertiesDict(
-                                enabled=True,
-                                duration=asp_retract_delay,
-                            ),
+                            delay=DelayPropertiesDict(enabled=False),
                         ),
                         aspirate_position=TipPositionDict(
                             position_reference=PositionReference.LIQUID_MENISCUS_START,
@@ -147,7 +144,10 @@ def get_frosting_class(ctx: protocol_api.ProtocolContext, asp_retract_delay: flo
                         correction_by_volume=[(0.0, 0.0)],
                         pre_wet=True,
                         mix=MixPropertiesDict(enabled=False),
-                        delay=DelayPropertiesDict(enabled=False),
+                        delay=delay=DelayPropertiesDict(
+                            enabled=True,
+                            duration=asp_retract_delay,
+                        ),
                     ),
                     dispense=SingleDispensePropertiesDict(
                         submerge=SubmergeDict(
