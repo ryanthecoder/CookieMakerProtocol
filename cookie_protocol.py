@@ -71,6 +71,14 @@ def add_parameters(parameters: protocol_api.ParameterContext):
         ),
         default=True,
     )
+    parameters.add_bool(
+        variable_name="use_gripper",
+        display_name="Use Gripper",
+        description=(
+            "Use Gripper to drop the cookie out of the Waste Chute at the end."
+        ),
+        default=False,
+    )
 
 def order_cookie_pattern(csv_data: List[List[str]]) -> List[CookiePoint]:
     """Return a dictionary of cookie points by unique line ID"""
@@ -189,11 +197,9 @@ def run(ctx: protocol_api.ProtocolContext):
     pipette = ctx.load_instrument("flex_1channel_1000", "left", tip_racks=[tips])
 
     # Load cookie
-    # TODO: make the cookie definition
     cookie = ctx.load_labware("opentrons_tough_cookie", "C2")
 
     # Load cookie dispenser and tip trash
-    #cookie_chute = ctx.load_waste_chute()
     tip_trash = ctx.load_trash_bin("A3")
 
     frosting_lw = ctx.load_labware(f"opentrons_6_tuberack_nest_50ml_conical", "B2")
@@ -359,21 +365,8 @@ def run(ctx: protocol_api.ProtocolContext):
                     volume_for_pipette_mode_configuration=None,
                 )
 
-                
-                # CASEY NOTE: Original aspirate commented out to take advantage of liquid classes
-                # pipette.aspirate(
-                #     volume=1000-pipette.current_volume,
-                #     flow_rate=FROSTING_FLOW_RATE,
-                #     location=_color_to_well(cookie_pattern[i].color).meniscus(z=-1, target="start"),
-                #     end_location=_color_to_well(cookie_pattern[i].color).meniscus(z=-1, target="end")
-                # )
+            ctx.comment(f"Drawing Line: First point x:{cookie_pattern[i-1].x} y:{cookie_pattern[i-1].y},  Second point x:{cookie_pattern[i].x} y:{cookie_pattern[i].y}")
 
-            # Casey NOTE: Try to prevent lines longer than the max length (127MM) from generating in the image app?
-            # Probably not possible anyways unless the app got a larger canvas?
-            ctx.comment(f"First point- x:{cookie_pattern[i-1].x} y:{cookie_pattern[i-1].y}  Second point- x:{cookie_pattern[i].x} y:{cookie_pattern[i].y}")
-
-
-            
             # Move at Z height to the next start point
             #pipette.move_to(start_loc.move(Point(x=0,y=0,z=WAYPOINT_Z_HEIGHT)))
 
@@ -391,15 +384,6 @@ def run(ctx: protocol_api.ProtocolContext):
                 trash_location=tip_trash,
             )
 
-            # CASEY NOTE: Original dispense commented out to take advantage of liquid classes
-            # Casey NOTE: Currently this results in us moving a few mm at a time, dispensing, and homing, over and over
-            # it works but it would take forever and not look smooth. We need some kind of line smoothing formula, maybe from the painting app?
-            # pipette.dispense(
-            #     frosting_volume,
-            #     flow_rate=FROSTING_FLOW_RATE,
-            #     location=start_loc,
-            #     end_location=end_loc
-            # )
             # Retract back up so we're above the frosting for the next line
             #pipette.move_to(end_loc.move(Point(x=0,y=0,z=WAYPOINT_Z_HEIGHT)))
     pipette.drop_tip(tip_trash)
@@ -407,4 +391,7 @@ def run(ctx: protocol_api.ProtocolContext):
     # Dispense the cookie!
     ctx.capture_image(home_before=True, filename="Cookie_pic", zoom=2.0)
     ctx.pause(msg="GET READY TO CATCH THE DISPENSED COOKIE! HAPPY HOLIDAYS!")
-    #ctx.move_labware(cookie, cookie_chute, use_gripper=True)
+
+    if ctx.params.use_gripper:
+        cookie_chute = ctx.load_waste_chute()
+        ctx.move_labware(cookie, cookie_chute, use_gripper=ctx.params.use_gripper)
