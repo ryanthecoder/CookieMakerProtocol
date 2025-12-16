@@ -347,7 +347,7 @@ def run(ctx: protocol_api.ProtocolContext):
             )
             if pipette.current_volume < frosting_volume:
                 # Handle liquid class aspiration
-                contents = pipette._core.aspirate_liquid_class(  
+                contents = pipette._core.aspirate_liquid_class(
                     volume=1000-pipette.current_volume,
                     source=(
                         _color_to_well(cookie_pattern[i].color).top(),
@@ -366,8 +366,7 @@ def run(ctx: protocol_api.ProtocolContext):
 
             ctx.comment(f"Drawing Line: First point x:{cookie_pattern[i-1].x} y:{cookie_pattern[i-1].y},  Second point x:{cookie_pattern[i].x} y:{cookie_pattern[i].y}")
 
-
-            pipette._core.dispense_liquid_class( 
+            pipette._core.dispense_liquid_class(
                 volume=frosting_volume,
                 dest=(
                     cookie["A1"].top(),
