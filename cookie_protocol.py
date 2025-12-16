@@ -115,7 +115,7 @@ def get_frosting_class(ctx: protocol_api.ProtocolContext, asp_retract_delay: flo
                         submerge=SubmergeDict(
                             start_position=TipPositionDict(
                                 position_reference=PositionReference.LIQUID_MENISCUS,
-                                offset={"x": 0, "y": 0, "z": 2},
+                                offset={"x": 0, "y": 0, "z": WAYPOINT_Z_HEIGHT},
                             ),
                             speed=10,
                             delay=DelayPropertiesDict(
@@ -125,7 +125,7 @@ def get_frosting_class(ctx: protocol_api.ProtocolContext, asp_retract_delay: flo
                         retract=RetractAspirateDict(
                             end_position=TipPositionDict(
                                 position_reference=PositionReference.LIQUID_MENISCUS,
-                                offset={"x": 0, "y": 0, "z": 0},
+                                offset={"x": 0, "y": 0, "z": WAYPOINT_Z_HEIGHT},
                             ),
                             speed=10,
                             air_gap_by_volume=[(0.0, 0.0)],
@@ -367,8 +367,6 @@ def run(ctx: protocol_api.ProtocolContext):
 
             ctx.comment(f"Drawing Line: First point x:{cookie_pattern[i-1].x} y:{cookie_pattern[i-1].y},  Second point x:{cookie_pattern[i].x} y:{cookie_pattern[i].y}")
 
-            # Move at Z height to the next start point
-            #pipette.move_to(start_loc.move(Point(x=0,y=0,z=WAYPOINT_Z_HEIGHT)))
 
             pipette._core.dispense_liquid_class( 
                 volume=frosting_volume,
@@ -384,8 +382,6 @@ def run(ctx: protocol_api.ProtocolContext):
                 trash_location=tip_trash,
             )
 
-            # Retract back up so we're above the frosting for the next line
-            #pipette.move_to(end_loc.move(Point(x=0,y=0,z=WAYPOINT_Z_HEIGHT)))
     pipette.drop_tip(tip_trash)
 
     # Dispense the cookie!
