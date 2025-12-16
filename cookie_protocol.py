@@ -128,7 +128,7 @@ def get_frosting_class(ctx: protocol_api.ProtocolContext, asp_retract_delay: flo
                                 offset={"x": 0, "y": 0, "z": WAYPOINT_Z_HEIGHT},
                             ),
                             speed=10,
-                            air_gap_by_volume=[(0.0, 0.0)],
+                            air_gap_by_volume=[(0.0, 5.0), (995.0, 5.0), (1000.0, 0.0)],
                             touch_tip=TouchTipPropertiesDict(enabled=False),
                             delay=DelayPropertiesDict(
                                 enabled=True,
