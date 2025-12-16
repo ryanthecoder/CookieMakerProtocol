@@ -335,10 +335,10 @@ def run(ctx: protocol_api.ProtocolContext):
             )
 
             transfer_properties.dispense.override_tip_positions(
-                new_position=PositionReference.WELL_CENTER,
-                new_offset=[cookie_pattern[i-1].x, cookie_pattern[i-1].y, 0],
-                new_end_position=PositionReference.WELL_CENTER,
-                new_end_offset=[cookie_pattern[i].x, cookie_pattern[i].y, 0],
+                new_position=PositionReference.LIQUID_MENISCUS_START,
+                new_offset=[cookie_pattern[i-1].x, cookie_pattern[i-1].y, DISPENSE_HEIGHT_ABOVE_COOKIE],
+                new_end_position=PositionReference.LIQUID_MENISCUS_START,
+                new_end_offset=[cookie_pattern[i].x, cookie_pattern[i].y, DISPENSE_HEIGHT_ABOVE_COOKIE],
             )
             pipette._core.load_liquid_class(
                 name=frosting_class.name,
