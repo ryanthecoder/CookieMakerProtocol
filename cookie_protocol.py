@@ -350,7 +350,7 @@ def run(ctx: protocol_api.ProtocolContext):
                 contents = pipette._core.aspirate_liquid_class(  
                     volume=1000-pipette.current_volume,
                     source=(
-                        _color_to_well(cookie_pattern[i].color).meniscus(z=-1, target="start"),
+                        _color_to_well(cookie_pattern[i].color).top(),
                         _color_to_well(cookie_pattern[i].color)._core,
                     ),
                     transfer_properties=transfer_properties,
@@ -370,7 +370,7 @@ def run(ctx: protocol_api.ProtocolContext):
             pipette._core.dispense_liquid_class( 
                 volume=frosting_volume,
                 dest=(
-                    start_loc,
+                    cookie["A1"].top(),
                     start_loc.labware.as_well()._core,
                 ),
                 source=None,
