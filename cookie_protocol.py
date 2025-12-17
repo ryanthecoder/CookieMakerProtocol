@@ -41,12 +41,12 @@ requirements = {
 
 }
 
-# Amount of uL of frosting to dispense per mm
-# This totals out to 1000~ uL of frosting for a single left-to-right line across the cookie
-# So at a 1 tip for a full line, you could do 85 straight lines top to bottom with a single tiprack
-FROSTING_PER_MM = 7.8
+# Global frosting values
+FROSTING_PER_MM = 23.4
 
-FROSTING_FLOW_RATE=300
+FROSTING_FLOW_RATE=400
+
+FROSTING_MAX_VOLUME=500
 
 DISPENSE_HEIGHT_ABOVE_COOKIE = 2.0
 WAYPOINT_Z_HEIGHT = 10.0
@@ -90,6 +90,13 @@ def add_parameters(parameters: protocol_api.ParameterContext):
         default=FROSTING_FLOW_RATE,
         minimum=200.0,
         maximum=500.0,
+    )
+    parameters.add_float(
+        variable_name="frosting_per_mm",
+        display_name="Frosting Per mm",
+        default=FROSTING_PER_MM,
+        minimum=FROSTING_PER_MM/2,
+        maximum=FROSTING_PER_MM*5,
     )
 
 def order_cookie_pattern(csv_data: List[List[str]]) -> List[CookiePoint]:
@@ -140,7 +147,7 @@ def get_frosting_class(ctx: protocol_api.ProtocolContext, asp_retract_delay: flo
                                 offset={"x": 0, "y": 0, "z": WAYPOINT_Z_HEIGHT},
                             ),
                             speed=10,
-                            air_gap_by_volume=[(0.0, 5.0), (995.0, 5.0), (1000.0, 0.0)],
+                            air_gap_by_volume=[(0.0, 0.0), (995.0, 0.0), (1000.0, 0.0)],
                             touch_tip=TouchTipPropertiesDict(enabled=False),
                             delay=DelayPropertiesDict(enabled=False),
                         ),
@@ -243,6 +250,7 @@ def run(ctx: protocol_api.ProtocolContext):
     # Retrieve Run Time Parameters
     csv_data = ctx.params.cookie_pattern.parse_as_csv()
     frosting_flow_rate = ctx.params.frosting_flow_rate
+    frosting_per_mm = ctx.params.frosting_per_mm
     cookie_pattern = order_cookie_pattern(csv_data)
 
     # Load frosting tips and pipette
@@ -362,7 +370,8 @@ def run(ctx: protocol_api.ProtocolContext):
                 previous_color = cookie_pattern[i].color
             # These are part of the same line, start pipetting!
             dist = math.sqrt(((cookie_pattern[i].x - cookie_pattern[i-1].x) ** 2) + ((cookie_pattern[i].y - cookie_pattern[i-1].y) ** 2))
-            frosting_volume = FROSTING_PER_MM * dist if (FROSTING_PER_MM * dist) <= 1000 else 1000
+            frosting_volume = frosting_per_mm * dist if (frosting_per_mm * dist) <= FROSTING_MAX_VOLUME else FROSTING_MAX_VOLUME
+            # Maybe we need a frosting min? Maybe that should be the frosting pet mm value.
 
             transfer_properties = frosting_class.get_for(
                 pipette.name, tip_rack=tips.uri
@@ -407,7 +416,7 @@ def run(ctx: protocol_api.ProtocolContext):
                 # Handle liquid class aspiration
                 try:
                     contents = pipette._core.aspirate_liquid_class(
-                        volume=1000-pipette.current_volume,
+                        volume=FROSTING_MAX_VOLUME-pipette.current_volume, # change this back to 1000 to be seperate from the max?
                         source=(
                             _color_to_well(cookie_pattern[i].color).top(),
                             _color_to_well(cookie_pattern[i].color)._core,
@@ -423,9 +432,37 @@ def run(ctx: protocol_api.ProtocolContext):
                         volume_for_pipette_mode_configuration=None,
                     )
                 except:
-                    # todo (chb, 2025-12-17): Something in our aspiration calculations got mucked in the conversion to liquid classes
-                    # It will occasionally report a bad calculation for aspiration volume, so skip for now if that happens?
-                    pass
+                    # todo (chb, 2025-12-17): Something in our aspiration calculations got mucked in the conversion to liquid classes which is why this is here.
+                    # It will occasionally report a bad calculation for aspiration volume, so instead dispense all and reset to a clean level?
+                    pipette._core.dispense_liquid_class(
+                        volume=pipette.current_volume,
+                        dest=(
+                            _color_to_well(cookie_pattern[i].color).top(),
+                            _color_to_well(cookie_pattern[i].color)._core,
+                        ),
+                        source=None,
+                        transfer_properties=transfer_properties,
+                        transfer_type=tx_comps_executor.TransferType.ONE_TO_ONE,
+                        tip_contents=contents,
+                        add_final_air_gap=False,
+                        trash_location=tip_trash,
+                    )
+                    contents = pipette._core.aspirate_liquid_class(
+                        volume=FROSTING_MAX_VOLUME-pipette.current_volume, # change this back to 1000 to be seperate from the max?
+                        source=(
+                            _color_to_well(cookie_pattern[i].color).top(),
+                            _color_to_well(cookie_pattern[i].color)._core,
+                        ),
+                        transfer_properties=transfer_properties,
+                        transfer_type=tx_comps_executor.TransferType.ONE_TO_ONE,
+                        tip_contents=[
+                            tx_comps_executor.LiquidAndAirGapPair(
+                                liquid=0,
+                                air_gap=0,
+                            )
+                        ],
+                        volume_for_pipette_mode_configuration=None,
+                    )
 
             ctx.comment(f"Drawing Line: First point x:{cookie_pattern[i-1].x} y:{cookie_pattern[i-1].y},  Second point x:{cookie_pattern[i].x} y:{cookie_pattern[i].y}")
 
