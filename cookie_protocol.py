@@ -46,7 +46,7 @@ requirements = {
 # So at a 1 tip for a full line, you could do 85 straight lines top to bottom with a single tiprack
 FROSTING_PER_MM = 7.8
 
-FROSTING_FLOW_RATE=500
+FROSTING_FLOW_RATE=300
 
 DISPENSE_HEIGHT_ABOVE_COOKIE = 2.0
 WAYPOINT_Z_HEIGHT = 10.0
@@ -84,6 +84,13 @@ def add_parameters(parameters: protocol_api.ParameterContext):
         ),
         default=False,
     )
+    parameters.add_float(
+        variable_name="frosting_flow_rate",
+        display_name="Frosting Flow Rate",
+        default=FROSTING_FLOW_RATE,
+        minimum=200.0,
+        maximum=500.0,
+    )
 
 def order_cookie_pattern(csv_data: List[List[str]]) -> List[CookiePoint]:
     """Return a dictionary of cookie points by unique line ID"""
@@ -110,7 +117,7 @@ def order_cookie_pattern(csv_data: List[List[str]]) -> List[CookiePoint]:
     return cookie_pattern
 
 # todo(chb, 12-15-2025): Extend this to have more than just the aspirate retract delay parameter, possibly convert to RTP
-def get_frosting_class(ctx: protocol_api.ProtocolContext, asp_retract_delay: float) -> LiquidClass:
+def get_frosting_class(ctx: protocol_api.ProtocolContext, asp_retract_delay: float, flow_rate: float) -> LiquidClass:
     """Returns a frosting liquid class based on the provided parameters."""
     return ctx.define_liquid_class(
         name="frosting",
@@ -145,7 +152,7 @@ def get_frosting_class(ctx: protocol_api.ProtocolContext, asp_retract_delay: flo
                             position_reference=PositionReference.LIQUID_MENISCUS_END,
                             offset={"x": 0, "y": 0, "z": -2},
                         ),
-                        flow_rate_by_volume=[(0.0, FROSTING_FLOW_RATE)],
+                        flow_rate_by_volume=[(0.0, flow_rate)],
                         correction_by_volume=[(0.0, 0.0)],
                         pre_wet=True,
                         mix=MixPropertiesDict(enabled=False),
@@ -177,14 +184,14 @@ def get_frosting_class(ctx: protocol_api.ProtocolContext, asp_retract_delay: flo
                             blowout=BlowoutPropertiesDict(
                                 enabled=False,
                                 location=BlowoutLocation.TRASH,
-                                flow_rate=FROSTING_FLOW_RATE,
+                                flow_rate=flow_rate,
                             ),
                         ),
                         dispense_position=TipPositionDict(
                             position_reference=PositionReference.WELL_TOP,
                             offset={"x": 0, "y": 0, "z": 0},
                         ),
-                        flow_rate_by_volume=[(0.0, FROSTING_FLOW_RATE)],
+                        flow_rate_by_volume=[(0.0, flow_rate)],
                         correction_by_volume=[(0.0, 0.0)],
                         push_out_by_volume=[(0.0, 0.0)],
                         mix=MixPropertiesDict(enabled=False),
@@ -213,14 +220,14 @@ def get_frosting_class(ctx: protocol_api.ProtocolContext, asp_retract_delay: flo
                             blowout=BlowoutPropertiesDict(
                                 enabled=False,
                                 location=BlowoutLocation.TRASH,
-                                flow_rate=FROSTING_FLOW_RATE,
+                                flow_rate=flow_rate,
                             ),
                         ),
                         dispense_position=TipPositionDict(
                             position_reference=PositionReference.WELL_TOP,
                             offset={"x": 0, "y": 0, "z": 0},
                         ),
-                        flow_rate_by_volume=[(0.0, FROSTING_FLOW_RATE)],
+                        flow_rate_by_volume=[(0.0, flow_rate)],
                         correction_by_volume=[(0.0, 0.0)],
                         delay=DelayPropertiesDict(enabled=False),
                         conditioning_by_volume= [(0,0)],
@@ -235,6 +242,7 @@ def get_frosting_class(ctx: protocol_api.ProtocolContext, asp_retract_delay: flo
 def run(ctx: protocol_api.ProtocolContext):
     # Retrieve Run Time Parameters
     csv_data = ctx.params.cookie_pattern.parse_as_csv()
+    frosting_flow_rate = ctx.params.frosting_flow_rate
     cookie_pattern = order_cookie_pattern(csv_data)
 
     # Load frosting tips and pipette
@@ -250,7 +258,7 @@ def run(ctx: protocol_api.ProtocolContext):
     frosting_lw = ctx.load_labware(f"opentrons_6_tuberack_nest_50ml_conical", "B2")
 
     # Frosting declarations
-    frosting_class = get_frosting_class(ctx, asp_retract_delay=5)
+    frosting_class = get_frosting_class(ctx, asp_retract_delay=5, flow_rate=frosting_flow_rate)
     assert isinstance(frosting_class, LiquidClass)
 
     # Red
