@@ -465,20 +465,23 @@ def run(ctx: protocol_api.ProtocolContext):
                     )
 
             ctx.comment(f"Drawing Line: First point x:{cookie_pattern[i-1].x} y:{cookie_pattern[i-1].y},  Second point x:{cookie_pattern[i].x} y:{cookie_pattern[i].y}")
-
-            pipette._core.dispense_liquid_class(
-                volume=frosting_volume,
-                dest=(
-                    cookie["A1"].top(),
-                    cookie["A1"]._core,
-                ),
-                source=None,
-                transfer_properties=transfer_properties,
-                transfer_type=tx_comps_executor.TransferType.ONE_TO_ONE,
-                tip_contents=contents,
-                add_final_air_gap=False,
-                trash_location=tip_trash,
-            )
+            try:
+                pipette._core.dispense_liquid_class(
+                    volume=frosting_volume,
+                    dest=(
+                        cookie["A1"].top(),
+                        cookie["A1"]._core,
+                    ),
+                    source=None,
+                    transfer_properties=transfer_properties,
+                    transfer_type=tx_comps_executor.TransferType.ONE_TO_ONE,
+                    tip_contents=contents,
+                    add_final_air_gap=False,
+                    trash_location=tip_trash,
+                )
+            except:
+                ctx.comment("Dispense failed, blowing out in place and skipping to next line.")
+                pipette.blow_out()
 
     pipette.drop_tip(tip_trash)
 
